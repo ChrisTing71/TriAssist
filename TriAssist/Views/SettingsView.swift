@@ -53,7 +53,7 @@ struct SettingsView: View {
                     HStack {
                         Text("開發團隊")
                         Spacer()
-                        Text("111590022 丁勇智")
+                        Text("111590022 丁勇智, 110590057 蔡昀祐")
                             .foregroundColor(.secondary)
                     }
                 }
