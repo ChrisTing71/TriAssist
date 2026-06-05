@@ -18,16 +18,30 @@ class CloudAIService: AIServiceProtocol {
         let currentTime = Date().formatted(date: .complete, time: .shortened)
         
         let systemInstruction = """
-        你是一個極度精準的智慧生活助理。請解析使用者的話並填入 JSON 結構。
-        【當下系統基準時間】：\(currentTime) 
+        你是一個精準的智慧生活助理，負責將使用者的自然語言拆解為結構化 JSON 資料。
+        【當下系統基準時間】：\(currentTime)（時區：Asia/Taipei，UTC+8）
 
-        【嚴格分類守則】（一次通常只會觸發一種）：
-        1. 記帳 (hasExpense)：只有使用者明確提到花費金額（如：花了 500、買便當 100 元）才能為 true。
-        2. 行程 (hasEvent)：只有包含具體「時間點或時間段」（如：明天下午 3 點開會）才能為 true。
-        3. 待辦 (hasTodo)：沒有時間、沒有金額，純粹是一件事情（如：記得去超商領包裹）才能為 true。
+        【分類規則】
+        - hasExpense = true：使用者明確提到金額或花費（例：花了 150、買便當 80 元）。
+        - hasEvent = true：包含具體的時間點或時間段（例：明天下午 3 點開會、週五 9~11 點）。
+        - hasTodo = true：純粹是一件待完成的事，無具體時間也無金額（例：記得去超商領包裹）。
+        - 複合情境可以同時觸發多個 true（例：「明天下午三點喝咖啡花了 150 元」→ hasEvent=true 且 hasExpense=true）。
+        - 某欄位為 false 時，其對應字串填 ""，金額填 0。
+        - 時間格式必須為 ISO 8601 含時區（例：2026-06-05T15:00:00+08:00）；若只說日期未說時間，預設 09:00；若未說結束時間，預設為開始時間加一小時。
+        - statusLog：一行人類可讀的摘要，說明本次解析結果（例：「已新增行程：牙醫回診；花費：掛號費 150 元」）。
 
-        若某個分類為 false，請將其對應的字串填為 ""，金額填為 0。
-        你必須且只能回傳一個 JSON 物件，嚴禁包含任何額外的說明、註解或 Markdown 標籤。
+        【Few-shot 範例】
+
+        輸入：「明天下午三點跟朋友喝咖啡花了 150 元」
+        輸出：{"hasExpense":true,"expenseItem":"咖啡","expenseAmount":150,"expenseCategory":"餐飲","hasEvent":true,"eventTitle":"跟朋友喝咖啡","eventStartISO":"<明天T15:00:00+08:00>","eventEndISO":"<明天T16:00:00+08:00>","hasTodo":false,"todoTitle":"","statusLog":"已新增行程：跟朋友喝咖啡；花費：咖啡 150 元"}
+
+        輸入：「記得明天要買牛奶」
+        輸出：{"hasExpense":false,"expenseItem":"","expenseAmount":0,"expenseCategory":"","hasEvent":false,"eventTitle":"","eventStartISO":"","eventEndISO":"","hasTodo":true,"todoTitle":"買牛奶","statusLog":"已新增待辦：買牛奶"}
+
+        輸入：「今天午餐花了 85 元吃便當」
+        輸出：{"hasExpense":true,"expenseItem":"便當","expenseAmount":85,"expenseCategory":"餐飲","hasEvent":false,"eventTitle":"","eventStartISO":"","eventEndISO":"","hasTodo":false,"todoTitle":"","statusLog":"已記帳：便當 85 元"}
+
+        你必須只回傳一個 JSON 物件，不得包含任何說明、註解或 Markdown 標籤。
         """
         
         // 3. 依據 Google 官方規範，建立強制的結構化 JSON 輸出設定 (Response Schema)
@@ -87,9 +101,9 @@ class CloudAIService: AIServiceProtocol {
         let prompt = """
         【現在時間】：\(currentTime)
         \(summaryText)
-        請只依據我的行程空檔，以行事曆行程為主，幫我合理安排與穿插這些待辦事項。
-        請用親切、條理清晰的語氣（繁體中文），給出具體的時間軸排程建議，直接輸出純文字建議即可。ｘ
-        嚴禁包含任何額外的說明、註解或 Markdown 標籤，字數在100字以內。
+
+        請以行事曆行程為錨點，在空檔中合理穿插待辦事項，給出具體的時間軸建議。
+        要求：繁體中文、親切語氣、純文字（禁止 JSON 或 Markdown）、100 字以內。
         """
         
         let requestBody: [String: Any] = [
