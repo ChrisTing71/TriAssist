@@ -26,6 +26,9 @@ class DashboardViewModel {
     var isLoadingBriefing = false
     var briefingMessage = ""   // shown when scheduleItems is empty
 
+    // Fixed routine summary injected from RoutineManager before each load
+    var routineSummary: String = ""
+
     // Brief result feedback after user submits text
     var lastActionResult = ""
     private var resultDismissTask: Task<Void, Never>?
@@ -78,8 +81,13 @@ class DashboardViewModel {
             ? "無待辦事項"
             : activeTodos.map { " - \($0.title)" }.joined(separator: "\n")
 
+        let routineSection = routineSummary.isEmpty ? "" : """
+        【固定行程】：\(routineSummary)
+
+        """
+
         let summaryText = """
-        我今天的行程如下：
+        \(routineSection)我今天的行程如下：
         \(eventSummary)
 
         我的待辦清單如下：

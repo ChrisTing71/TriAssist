@@ -9,6 +9,7 @@ import SwiftData
 @main
 struct TriAssistApp: App {
     @State private var authManager = AuthManager()
+    @State private var routineManager = RoutineManager()
 
     var body: some Scene {
         WindowGroup {
@@ -29,6 +30,7 @@ struct TriAssistApp: App {
                     .tabItem { Label("Settings", systemImage: "gearshape.fill") }
             }
             .environment(authManager)
+            .environment(routineManager)
         }
         .modelContainer(for: [Expense.self, Event.self, TodoTask.self])
     }

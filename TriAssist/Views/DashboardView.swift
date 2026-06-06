@@ -8,6 +8,7 @@ import SwiftData
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(RoutineManager.self) private var routineManager
     @State private var viewModel = DashboardViewModel()
 
     var body: some View {
@@ -40,6 +41,7 @@ struct DashboardView: View {
                 }
             }
             .task {
+                viewModel.routineSummary = routineManager.aiSummary
                 await viewModel.loadDailyBriefing(modelContext: modelContext)
             }
             .alert("AI 功能未啟用", isPresented: $viewModel.showAIUnavailableAlert) {
@@ -90,7 +92,10 @@ struct DashboardView: View {
                     .fontWeight(.bold)
                 Spacer()
                 Button {
-                    Task { await viewModel.loadDailyBriefing(modelContext: modelContext, forceRefresh: true) }
+                    Task {
+                        viewModel.routineSummary = routineManager.aiSummary
+                        await viewModel.loadDailyBriefing(modelContext: modelContext, forceRefresh: true)
+                    }
                 } label: {
                     Image(systemName: "arrow.clockwise.circle.fill")
                         .font(.title3)

@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage("customApiKey")     private var apiKey: String = ""
     @State private var showSignOutConfirm = false
     @State private var isSigningInWithApple = false
+    @State private var showRoutineEditor = false
 
     var body: some View {
         NavigationStack {
@@ -21,6 +22,27 @@ struct SettingsView: View {
                     loggedInSection
                 } else {
                     signInSection
+                }
+
+                // Fixed routines
+                Section {
+                    Button {
+                        showRoutineEditor = true
+                    } label: {
+                        HStack {
+                            Label("每日 & 每週固定行程", systemImage: "calendar.badge.clock")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .foregroundColor(.primary)
+                } footer: {
+                    Text("設定起床、睡眠時間與課表，AI 排程建議將自動參考這些資料。")
+                }
+                .sheet(isPresented: $showRoutineEditor) {
+                    RoutineEditorView()
                 }
 
                 // AI engine settings
