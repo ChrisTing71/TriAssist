@@ -2,8 +2,6 @@
 //  TodoListView.swift
 //  TriAssist
 //
-//  Created by 丁帥 on 2026/6/4.
-//
 
 import SwiftUI
 import SwiftData
@@ -11,42 +9,39 @@ import SwiftData
 struct TodoListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \TodoTask.dueDate) private var todos: [TodoTask]
-    
+
     @State private var isShowingAddSheet = false
-    
+
     var body: some View {
         NavigationStack {
-            List {
+            Group {
                 if todos.isEmpty {
-                    ContentUnavailableView("清單空空如也", systemImage: "checklist", description: Text("點擊 + 建立新任務，讓生活更有條理"))
+                    ContentUnavailableView(
+                        "清單空空如也",
+                        systemImage: "checklist",
+                        description: Text("點擊 + 建立新任務，讓生活更有條理")
+                    )
                 } else {
-                    ForEach(todos) { todo in
-                        HStack {
-                            Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(todo.isCompleted ? .green : .gray)
-                                .onTapGesture {
-                                    todo.isCompleted.toggle()
-                                }
-                            
-                            VStack(alignment: .leading) {
-                                Text(todo.title)
-                                    .strikethrough(todo.isCompleted)
-                                if let date = todo.dueDate {
-                                    Text("截止日: \(date.formatted(date: .abbreviated, time: .omitted))")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
+                    ScrollView {
+                        LazyVStack(spacing: 10) {
+                            ForEach(todos) { todo in
+                                todoRow(todo)
                             }
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .padding(.bottom, 32)
                     }
-                    .onDelete(perform: deleteTodos)
                 }
             }
-            .navigationTitle("待辦清單")
+            .navigationTitle("Todo")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { isShowingAddSheet = true }) {
-                        Image(systemName: "plus")
+                    Button {
+                        isShowingAddSheet = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(.blue)
                     }
                 }
             }
@@ -55,23 +50,72 @@ struct TodoListView: View {
             }
         }
     }
-    
-    private func deleteTodos(at offsets: IndexSet) {
-        for index in offsets {
-            modelContext.delete(todos[index])
+
+    private func todoRow(_ todo: TodoTask) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            // Rounded-square checkbox
+            Button {
+                todo.isCompleted.toggle()
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(todo.isCompleted ? Color.green : Color.secondary.opacity(0.5), lineWidth: 2)
+                        .frame(width: 28, height: 28)
+                    if todo.isCompleted {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.green)
+                            .frame(width: 28, height: 28)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(todo.title)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(todo.isCompleted ? .secondary : .primary)
+                    .strikethrough(todo.isCompleted, color: .secondary)
+
+                if let date = todo.dueDate {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.caption2)
+                        Text(date.formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(14)
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(14)
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                modelContext.delete(todo)
+            } label: {
+                Label("刪除", systemImage: "trash")
+            }
         }
     }
 }
 
-// 手動新增待辦的表單
+// MARK: - Add Todo Sheet
 struct AddTodoView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var title = ""
     @State private var includeDate = false
     @State private var dueDate = Date()
-    
+
     var body: some View {
         NavigationStack {
             Form {

@@ -2,8 +2,6 @@
 //  TriAssistApp.swift
 //  TriAssist
 //
-//  Created by 丁帥 on 2026/6/4.
-//
 
 import SwiftUI
 import SwiftData
@@ -14,19 +12,19 @@ struct TriAssistApp: App {
         WindowGroup {
             TabView {
                 DashboardView()
-                    .tabItem { Label("智慧管家", systemImage: "brain.head.profile") }
-                
+                    .tabItem { Label("Dashboard", systemImage: "square.grid.2x2.fill") }
+
                 CalendarView()
-                    .tabItem { Label("行事曆", systemImage: "calendar") }
-                
+                    .tabItem { Label("Calendar", systemImage: "calendar") }
+
                 TodoListView()
-                    .tabItem { Label("待辦清單", systemImage: "checklist") }
-                
+                    .tabItem { Label("Todo", systemImage: "checklist") }
+
                 FinanceView()
-                    .tabItem { Label("財務管家", systemImage: "creditcard.fill") }
-                
+                    .tabItem { Label("Finance", systemImage: "wallet.bifold.fill") }
+
                 SettingsView()
-                    .tabItem { Label("系統設定", systemImage: "gearshape") }
+                    .tabItem { Label("Settings", systemImage: "gearshape.fill") }
             }
             .modelContainer(for: [Expense.self, Event.self, TodoTask.self])
         }
