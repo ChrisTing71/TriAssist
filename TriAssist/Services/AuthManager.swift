@@ -46,10 +46,13 @@ class AuthManager: NSObject {
     func handleAppleSignInResult(_ result: Result<ASAuthorization, Error>) {
         switch result {
         case .success(let auth):
-            guard let credential = auth.credential as? ASAuthorizationAppleIDCredential else { return }
+            guard let credential = auth.credential as? ASAuthorizationAppleIDCredential else {
+                errorMessage = "無法取得 Apple 憑證，請重試。"
+                return
+            }
 
             // Apple only returns name/email on the very first sign-in.
-            // Read from saved profile if present so subsequent logins don't lose the name.
+            // On subsequent logins these are empty — fall back to the previously saved name.
             var name = ""
             if let fullName = credential.fullName {
                 let parts = [fullName.givenName, fullName.familyName].compactMap { $0 }
@@ -69,8 +72,13 @@ class AuthManager: NSObject {
             errorMessage = ""
 
         case .failure(let error):
-            // Ignore user-cancelled errors
-            if (error as? ASAuthorizationError)?.code != .canceled {
+            let code = (error as? ASAuthorizationError)?.code
+            switch code {
+            case .canceled:
+                break   // user dismissed — not an error
+            case .unknown:
+                errorMessage = "Sign in with Apple 未啟用。\n請在 Xcode → Signing & Capabilities 加入此功能，並確認模擬器已登入 iCloud。"
+            default:
                 errorMessage = error.localizedDescription
             }
         }

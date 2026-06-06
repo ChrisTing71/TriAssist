@@ -8,10 +8,10 @@ import AuthenticationServices
 
 struct LoginView: View {
     @Environment(AuthManager.self) private var authManager
+    @State private var isSigningInWithApple = false
 
     var body: some View {
         ZStack {
-            // Background
             LinearGradient(
                 colors: [Color(.systemBackground), Color(.secondarySystemBackground)],
                 startPoint: .topLeading,
@@ -32,7 +32,6 @@ struct LoginView: View {
                             .font(.system(size: 48))
                             .foregroundStyle(.blue.gradient)
                     }
-
                     VStack(spacing: 6) {
                         Text("TriAssist")
                             .font(.system(size: 36, weight: .bold, design: .rounded))
@@ -44,28 +43,42 @@ struct LoginView: View {
 
                 Spacer()
 
-                // Sign-in buttons
                 VStack(spacing: 14) {
                     // Sign in with Apple
-                    SignInWithAppleButton(.signIn, onRequest: { request in
-                        request.requestedScopes = [.fullName, .email]
-                    }, onCompletion: { result in
-                        authManager.handleAppleSignInResult(result)
-                    })
-                    .signInWithAppleButtonStyle(.black)
-                    .frame(height: 52)
-                    .cornerRadius(14)
+                    ZStack {
+                        SignInWithAppleButton(.signIn, onRequest: { request in
+                            request.requestedScopes = [.fullName, .email]
+                            authManager.errorMessage = ""
+                            isSigningInWithApple = true
+                        }, onCompletion: { result in
+                            // Explicitly dispatch to MainActor to guarantee UI update
+                            Task { @MainActor in
+                                isSigningInWithApple = false
+                                authManager.handleAppleSignInResult(result)
+                            }
+                        })
+                        .signInWithAppleButtonStyle(.black)
+                        .frame(height: 52)
+                        .cornerRadius(14)
+                        .disabled(isSigningInWithApple || authManager.isLoading)
+
+                        // Show spinner inside button area while waiting
+                        if isSigningInWithApple {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color.black.opacity(0.85))
+                                .frame(height: 52)
+                            ProgressView().tint(.white)
+                        }
+                    }
 
                     // Sign in with Google
                     Button {
+                        authManager.errorMessage = ""
                         Task { await authManager.signInWithGoogle() }
                     } label: {
                         HStack(spacing: 10) {
-                            // Google "G" icon
                             ZStack {
-                                Circle()
-                                    .fill(.white)
-                                    .frame(width: 24, height: 24)
+                                Circle().fill(.white).frame(width: 24, height: 24)
                                 Text("G")
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundStyle(
@@ -83,36 +96,37 @@ struct LoginView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
                         .background(Color(.secondarySystemBackground))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color(.separator), lineWidth: 1)
-                        )
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(.separator), lineWidth: 1))
                         .cornerRadius(14)
                     }
-                    .disabled(authManager.isLoading)
+                    .disabled(isSigningInWithApple || authManager.isLoading)
                 }
                 .padding(.horizontal, 32)
 
-                // Error message
+                // Error message (shown for all auth errors)
                 if !authManager.errorMessage.isEmpty {
-                    Text(authManager.errorMessage)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                        .padding(.top, 10)
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .foregroundColor(.red)
+                        Text(authManager.errorMessage)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.top, 12)
                 }
 
                 Spacer().frame(height: 60)
             }
 
-            // Loading overlay
+            // Google loading overlay
             if authManager.isLoading {
                 ZStack {
                     Color.black.opacity(0.3).ignoresSafeArea()
                     VStack(spacing: 14) {
                         ProgressView().scaleEffect(1.4).tint(.white)
-                        Text("登入中...").foregroundColor(.white).font(.subheadline)
+                        Text("Google 登入中...").foregroundColor(.white).font(.subheadline)
                     }
                     .padding(28)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
