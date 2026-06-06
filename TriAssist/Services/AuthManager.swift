@@ -231,8 +231,10 @@ class AuthManager: NSObject {
 
 // MARK: - ASWebAuthenticationPresentationContextProviding
 extension AuthManager: ASWebAuthenticationPresentationContextProviding {
+    // presentationAnchor is always called on the main thread by iOS,
+    // so MainActor.assumeIsolated is safe here.
     nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        DispatchQueue.main.sync {
+        MainActor.assumeIsolated {
             UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
                 .first?.windows
