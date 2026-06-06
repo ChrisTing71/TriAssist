@@ -2,38 +2,65 @@
 //  AIServiceProtocol.swift
 //  TriAssist
 //
-//  Created by 丁帥 on 2026/6/4.
-//
 
 import Foundation
-import FoundationModels // 引入北科大課堂簡報教材採用的 AI 框架
+import FoundationModels
 
-// 配合簡報第 72-75 頁，使用 @Generable 將 AI 生成結果直接對應結構化型別
+// Structured output for user intent parsing
 @Generable
 struct AIResultStructured: Codable {
-    // 🌟 優化 1：為 Boolean 加上嚴格判定條件
     @Guide(description: "只有使用者明確提到『金額、花費、買了什麼』時才為 true，否則絕對要是 false。")
     let hasExpense: Bool
     let expenseItem: String
     let expenseAmount: Double
     let expenseCategory: String
-    
+
     @Guide(description: "只有明確提到『特定的時間段、開會、約會』時才為 true。若只是一般任務請標為 false。")
     let hasEvent: Bool
     let eventTitle: String
     let eventStartISO: String
     let eventEndISO: String
-    
+
     @Guide(description: "只有這是一件『需要被完成的任務』且沒有具體執行時間與花費時才為 true。")
     let hasTodo: Bool
     let todoTitle: String
-    
-    @Guide(description: "Must be 'TRUE' or 'FALSE' based on user intent.")
+
+    @Guide(description: "一行繁體中文摘要，說明本次解析了什麼（例：已新增行程：牙醫回診；花費：掛號費 150 元）")
     let statusLog: String
 }
 
-// 統一的 AI 接口
+// Structured item for daily schedule timeline
+struct DailyScheduleItem: Codable, Identifiable {
+    let time: String    // "HH:mm" or "" if unscheduled
+    let title: String
+    let type: String    // "event" | "todo" | "suggestion"
+    let detail: String  // short subtitle, may be ""
+
+    var id: String { "\(time)-\(title)" }
+
+    init(time: String, title: String, type: String, detail: String) {
+        self.time = time
+        self.title = title
+        self.type = type
+        self.detail = detail
+    }
+
+    // Decode from JSON without requiring an id field
+    enum CodingKeys: String, CodingKey {
+        case time, title, type, detail
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        time   = try c.decode(String.self, forKey: .time)
+        title  = try c.decode(String.self, forKey: .title)
+        type   = try c.decode(String.self, forKey: .type)
+        detail = (try? c.decode(String.self, forKey: .detail)) ?? ""
+    }
+}
+
+// Service protocol
 protocol AIServiceProtocol {
     func parseUserIntent(text: String, apiKey: String) async throws -> AIResultStructured
-    func generateDailyPlan(summaryText: String, apiKey: String) async throws -> String
+    func generateDailyPlan(summaryText: String, apiKey: String) async throws -> [DailyScheduleItem]
 }

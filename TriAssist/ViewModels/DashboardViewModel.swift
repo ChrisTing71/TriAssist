@@ -2,12 +2,10 @@
 //  DashboardViewModel.swift
 //  TriAssist
 //
-//  Created by 丁帥 on 2026/6/4.
-//
 
 import SwiftUI
 import SwiftData
-import FoundationModels // 引入以檢查系統 AI 可用性
+import FoundationModels
 
 enum AIEngine: String, CaseIterable {
     case cloud = "雲端高效能 AI"
@@ -22,91 +20,105 @@ class DashboardViewModel {
     var isProcessing = false
     var inputText = ""
     var showAIUnavailableAlert = false
-    
-    // 存放 AI 優化後的行程建議文字
-    var aiSuggestion: String = "正在為您準備今日的日程優化建議..."
-    // 防止重複觸發的旗標
+
+    // Daily schedule timeline items
+    var scheduleItems: [DailyScheduleItem] = []
+    var isLoadingBriefing = false
+    var briefingMessage = ""   // shown when scheduleItems is empty
+
+    // Brief result feedback after user submits text
+    var lastActionResult = ""
+    private var resultDismissTask: Task<Void, Never>?
+
     private var hasLoadedBriefing = false
-    
+
     init() {
-        if let savedEngineString = UserDefaults.standard.string(forKey: "selectedAIEngine"),
-           let engine = AIEngine(rawValue: savedEngineString) {
+        if let savedString = UserDefaults.standard.string(forKey: "selectedAIEngine"),
+           let engine = AIEngine(rawValue: savedString) {
             self.selectedEngine = engine
         }
         self.apiKey = UserDefaults.standard.string(forKey: "customApiKey") ?? ""
     }
-    
+
     private var aiService: AIServiceProtocol {
         selectedEngine == .cloud ? CloudAIService() : AppleIntelligenceService()
     }
-    
-    // 🌟 優化：自動讀取今天資料並向 AI 請求優化（整合 forceRefresh 支援重試）
+
+    // MARK: - Load daily briefing
     func loadDailyBriefing(modelContext: ModelContext, forceRefresh: Bool = false) async {
-        // 除非是強制刷新，否則若已經載入過就直接返回，防止切換 Tab 重複觸發
         guard !hasLoadedBriefing || forceRefresh else { return }
         hasLoadedBriefing = true
-        
-        // 如果是使用者手動點擊重試，先給予文字畫面的即時回饋
-        if forceRefresh {
-            withAnimation {
-                self.aiSuggestion = "正在為您重新整理今日的日程建議..."
-            }
+
+        withAnimation {
+            isLoadingBriefing = true
+            briefingMessage = ""
+            if forceRefresh { scheduleItems = [] }
         }
-        
+
         let today = Date()
         let allEvents = (try? modelContext.fetch(FetchDescriptor<Event>())) ?? []
         let allTodos = (try? modelContext.fetch(FetchDescriptor<TodoTask>())) ?? []
-        
+
         let todayEvents = allEvents.filter { Calendar.current.isDate($0.startTime, inSameDayAs: today) }
         let activeTodos = allTodos.filter { !$0.isCompleted }
-        
-        if todayEvents.isEmpty && activeTodos.isEmpty {
-            self.aiSuggestion = "您今天目前沒有任何行程與待辦任務，點擊下方跟我聊天來新增吧！"
+
+        guard !todayEvents.isEmpty || !activeTodos.isEmpty else {
+            withAnimation {
+                isLoadingBriefing = false
+                briefingMessage = "今天目前沒有行程與待辦任務，跟我說說你今天的計畫吧！"
+            }
             return
         }
-        
-        // 在 MainActor 執行緒內把資料轉化為純文字 String (Sendable)
-        let eventSummary = todayEvents.isEmpty ? "無行程" : todayEvents.map { " - \($0.title) (\($0.startTime.formatted(date: .omitted, time: .shortened)) ~ \($0.endTime.formatted(date: .omitted, time: .shortened)))" }.joined(separator: "\n")
-        let todoSummary = activeTodos.isEmpty ? "無待辦事項" : activeTodos.map { " - \($0.title)" }.joined(separator: "\n")
-        
+
+        let eventSummary = todayEvents.isEmpty
+            ? "無行程"
+            : todayEvents.map { " - \($0.title) (\($0.startTime.formatted(date: .omitted, time: .shortened)) ~ \($0.endTime.formatted(date: .omitted, time: .shortened)))" }.joined(separator: "\n")
+
+        let todoSummary = activeTodos.isEmpty
+            ? "無待辦事項"
+            : activeTodos.map { " - \($0.title)" }.joined(separator: "\n")
+
         let summaryText = """
         我今天的行程如下：
         \(eventSummary)
-        
+
         我的待辦清單如下：
         \(todoSummary)
         """
-        
+
         do {
-            // 傳遞 Sendable 的 String 變數，避開 Swift 6 檢查警告
-            let recommendation = try await aiService.generateDailyPlan(summaryText: summaryText, apiKey: apiKey)
+            let items = try await aiService.generateDailyPlan(summaryText: summaryText, apiKey: apiKey)
             withAnimation {
-                self.aiSuggestion = recommendation
+                scheduleItems = items
+                isLoadingBriefing = false
+                briefingMessage = items.isEmpty ? "AI 無法生成排程建議，請稍後再試。" : ""
             }
         } catch {
-            self.aiSuggestion = "今日日程排程失敗，請檢查網路或 API Key 設定。"
+            withAnimation {
+                isLoadingBriefing = false
+                briefingMessage = "排程建議載入失敗，請檢查網路或 API Key 設定。"
+            }
         }
     }
-    
-    // 4. 核心處理函式
+
+    // MARK: - Handle user text/voice input
     func handleUserVoiceOrTextInput(modelContext: ModelContext) async {
         let cleanText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanText.isEmpty else { return }
-        
+
         if selectedEngine == .apple && SystemLanguageModel.default.availability != .available {
-            self.showAIUnavailableAlert = true
+            showAIUnavailableAlert = true
             return
         }
-        
-        withAnimation { self.isProcessing = true }
-        
+
+        withAnimation { isProcessing = true }
+
         do {
             let result = try await aiService.parseUserIntent(text: cleanText, apiKey: apiKey)
-            
+            let formatter = ISO8601DateFormatter()
+
             withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                let formatter = ISO8601DateFormatter()
-                
-                if result.hasExpense && result.expenseAmount > 0 { // 雙重防呆
+                if result.hasExpense && result.expenseAmount > 0 {
                     let newExpense = Expense(
                         item: result.expenseItem.isEmpty ? "未命名消費" : result.expenseItem,
                         amount: result.expenseAmount,
@@ -115,24 +127,45 @@ class DashboardViewModel {
                     modelContext.insert(newExpense)
                 }
 
-                if result.hasEvent && !result.eventTitle.isEmpty { // 防呆
+                if result.hasEvent && !result.eventTitle.isEmpty {
                     let start = formatter.date(from: result.eventStartISO) ?? Date()
-                    let end = formatter.date(from: result.eventEndISO) ?? Date().addingTimeInterval(3600)
-                    let newEvent = Event(title: result.eventTitle, startTime: start, endTime: end)
-                    modelContext.insert(newEvent)
+                    let end = formatter.date(from: result.eventEndISO) ?? start.addingTimeInterval(3600)
+                    modelContext.insert(Event(title: result.eventTitle, startTime: start, endTime: end))
                 }
 
-                if result.hasTodo && !result.todoTitle.isEmpty { // 防呆
-                    let newTodo = TodoTask(title: result.todoTitle)
-                    modelContext.insert(newTodo)
+                if result.hasTodo && !result.todoTitle.isEmpty {
+                    modelContext.insert(TodoTask(title: result.todoTitle))
                 }
-                
-                self.inputText = ""
+
+                inputText = ""
             }
+
+            // Show result feedback and auto-dismiss after 3 seconds
+            if !result.statusLog.isEmpty {
+                showResult(result.statusLog)
+            }
+
+            // Refresh briefing to reflect newly added items
+            if result.hasEvent || result.hasTodo {
+                Task {
+                    await loadDailyBriefing(modelContext: modelContext, forceRefresh: true)
+                }
+            }
+
         } catch {
             print("❌ 核心管家分流失敗: \(error.localizedDescription)")
         }
-        
-        withAnimation { self.isProcessing = false }
+
+        withAnimation { isProcessing = false }
+    }
+
+    private func showResult(_ message: String) {
+        resultDismissTask?.cancel()
+        withAnimation { lastActionResult = message }
+        resultDismissTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            withAnimation { lastActionResult = "" }
+        }
     }
 }
