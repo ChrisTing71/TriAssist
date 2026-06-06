@@ -2,67 +2,152 @@
 //  SettingsView.swift
 //  TriAssist
 //
-//  Created by 丁帥 on 2026/6/4.
-//
 
 import SwiftUI
 
 struct SettingsView: View {
-    // 透過監聽與 ViewModel 一致的 AppStorage，達成跨頁面的設定即時持久化連動
+    @Environment(AuthManager.self) private var authManager
     @AppStorage("selectedAIEngine") private var selectedEngine: AIEngine = .cloud
-    @AppStorage("customApiKey") private var apiKey: String = ""
-    
+    @AppStorage("customApiKey")     private var apiKey: String = ""
+    @State private var showSignOutConfirm = false
+
     var body: some View {
         NavigationStack {
             Form {
-                // 區塊一：AI 引擎切換核心後台
+                // User profile card
+                if let user = authManager.currentUser {
+                    profileSection(user)
+                }
+
+                // AI engine settings
                 Section(header: Text("AI 核心驅動引擎設定")) {
                     Picker("處理核心", selection: $selectedEngine) {
-                        Text("雲端高智能 AI (預設)").tag(AIEngine.cloud)
+                        Text("雲端高效能 AI (預設)").tag(AIEngine.cloud)
                         Text("Apple Intelligence (地端)").tag(AIEngine.apple)
                     }
-                    .pickerStyle(.inline) // 展開清單方便快速點選
-                    .onChange(of: selectedEngine) { oldValue, newValue in
-                                            UserDefaults.standard.set(newValue.rawValue, forKey: "selectedAIEngine")
-                                        }
+                    .pickerStyle(.inline)
+                    .onChange(of: selectedEngine) { _, newValue in
+                        UserDefaults.standard.set(newValue.rawValue, forKey: "selectedAIEngine")
+                    }
+
                     if selectedEngine == .cloud {
                         HStack {
-                            Image(systemName: "key.fill")
-                                .foregroundColor(.orange)
-                            SecureField("請輸入您的 OpenAI API Key", text: $apiKey)
+                            Image(systemName: "key.fill").foregroundColor(.orange)
+                            SecureField("Gemini API Key", text: $apiKey)
                         }
                     } else {
                         HStack {
-                            Image(systemName: "apple.intelligence")
-                                .foregroundStyle(.gray)
-                            Text("已鎖定 iPhone 本地神經網路大模型。資料絕不上雲、離線完全可用且注重個人隱私。")
-                                .font(.caption)
-                                .foregroundColor(.gray)
+                            Image(systemName: "apple.intelligence").foregroundStyle(.gray)
+                            Text("已使用 iPhone 本地神經網路，資料不上傳雲端。")
+                                .font(.caption).foregroundColor(.gray)
                         }
                     }
                 }
-                
-                // 區塊二：期末專案團隊與上架資訊資訊
-                Section(header: Text("關於我們")) {
+
+                // Google Sign-In config
+                Section(header: Text("Google 登入設定")) {
                     HStack {
-                        Text("專案名稱")
-                        Spacer()
-                        Text("TriAssist")
-                            .foregroundColor(.secondary)
+                        Image(systemName: "key.fill").foregroundColor(.blue)
+                        @Bindable var manager = authManager
+                        TextField("Google Client ID", text: $manager.googleClientId)
+                            .autocapitalization(.none)
+                            .autocorrectionDisabled()
                     }
-                    HStack {
-                        Text("開發團隊")
-                        Spacer()
-                        Text("111590022 丁勇智, 110590057 蔡昀祐")
-                            .foregroundColor(.secondary)
+                    Text("格式：xxxxxxx.apps.googleusercontent.com\n需在 Google Cloud Console 建立 OAuth 2.0 iOS 用戶端 ID。")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                // About
+                Section(header: Text("關於我們")) {
+                    infoRow("專案名稱", value: "TriAssist")
+                    infoRow("開發團隊", value: "111590022 丁勇智 · 110590057 蔡昀祐")
+                }
+
+                // Sign out
+                Section {
+                    Button(role: .destructive) {
+                        showSignOutConfirm = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("登出")
+                                .fontWeight(.semibold)
+                            Spacer()
+                        }
                     }
                 }
             }
-            .navigationTitle("系統設定")
+            .navigationTitle("Settings")
+            .confirmationDialog("確定要登出嗎？", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
+                Button("登出", role: .destructive) { authManager.signOut() }
+                Button("取消", role: .cancel) { }
+            }
+        }
+    }
+
+    // MARK: - Profile section
+    @ViewBuilder
+    private func profileSection(_ user: UserProfile) -> some View {
+        Section {
+            HStack(spacing: 14) {
+                // Avatar circle
+                ZStack {
+                    Circle()
+                        .fill(user.provider == .apple ? Color(.systemGray5) : Color.blue.opacity(0.15))
+                        .frame(width: 56, height: 56)
+                    Text(user.initials)
+                        .font(.title3).bold()
+                        .foregroundColor(user.provider == .apple ? .primary : .blue)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(user.displayName)
+                        .font(.headline)
+                    if !user.email.isEmpty {
+                        Text(user.email)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                // Provider badge
+                providerBadge(user.provider)
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("使用者資料")
+        }
+    }
+
+    @ViewBuilder
+    private func providerBadge(_ provider: AuthProvider) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: provider == .apple ? "apple.logo" : "g.circle.fill")
+                .font(.caption)
+            Text(provider.rawValue)
+                .font(.caption2)
+                .fontWeight(.semibold)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color(.tertiarySystemBackground))
+        .cornerRadius(8)
+        .foregroundColor(.secondary)
+    }
+
+    private func infoRow(_ label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(value).foregroundColor(.secondary).font(.caption)
         }
     }
 }
 
 #Preview {
     SettingsView()
+        .environment(AuthManager())
 }
