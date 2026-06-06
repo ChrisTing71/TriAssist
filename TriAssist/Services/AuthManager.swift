@@ -25,11 +25,7 @@ class AuthManager: NSObject {
 
     var isLoggedIn: Bool { currentUser != nil }
 
-    // Google client ID stored in UserDefaults; user sets it in Settings
-    var googleClientId: String {
-        get { UserDefaults.standard.string(forKey: "googleClientId") ?? "" }
-        set { UserDefaults.standard.set(newValue, forKey: "googleClientId") }
-    }
+    private let googleClientId = "650304933460-ou75ngpcvpja4foqtnu9pcu4j2oc5e12.apps.googleusercontent.com"
 
     private var webAuthSession: ASWebAuthenticationSession?
 

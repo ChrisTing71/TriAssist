@@ -48,20 +48,6 @@ struct SettingsView: View {
                     }
                 }
 
-                // Google Sign-In config
-                Section(header: Text("Google 登入設定")) {
-                    HStack {
-                        Image(systemName: "key.fill").foregroundColor(.blue)
-                        @Bindable var manager = authManager
-                        TextField("Google Client ID", text: $manager.googleClientId)
-                            .autocapitalization(.none)
-                            .autocorrectionDisabled()
-                    }
-                    Text("格式：xxxxxxx.apps.googleusercontent.com")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-
                 // About
                 Section(header: Text("關於我們")) {
                     infoRow("專案名稱", value: "TriAssist")
