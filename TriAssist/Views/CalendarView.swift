@@ -12,76 +12,70 @@ struct CalendarView: View {
 
     @State private var selectedDate = Date()
     @State private var isShowingAddSheet = false
+    @State private var editingEvent: Event? = nil
 
     private var filteredEvents: [Event] {
         allEvents.filter { Calendar.current.isDate($0.startTime, inSameDayAs: selectedDate) }
     }
 
-    private var upcomingEvents: [Event] {
-        let today = Calendar.current.startOfDay(for: Date())
-        return allEvents.filter { $0.startTime >= today }
-    }
-
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Calendar grid
-                    DatePicker("選擇日期", selection: $selectedDate, displayedComponents: [.date])
-                        .datePickerStyle(.graphical)
-                        .padding(.horizontal, 8)
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(16)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
+            VStack(spacing: 0) {
+                DatePicker("選擇日期", selection: $selectedDate, displayedComponents: [.date])
+                    .datePickerStyle(.graphical)
+                    .padding(.horizontal, 8)
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(16)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
 
-                    // Events for selected date
-                    VStack(alignment: .leading, spacing: 10) {
-                        if filteredEvents.isEmpty {
-                            HStack {
-                                Image(systemName: "calendar.badge.checkmark")
-                                    .foregroundColor(.secondary)
-                                Text("今天沒有安排行程")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 20)
-                        } else {
-                            ForEach(filteredEvents) { event in
-                                eventRow(event)
-                            }
+                if filteredEvents.isEmpty {
+                    HStack {
+                        Image(systemName: "calendar.badge.checkmark")
+                            .foregroundColor(.secondary)
+                        Text("今天沒有安排行程")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+                    Spacer()
+                } else {
+                    List {
+                        ForEach(filteredEvents) { event in
+                            eventRow(event)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .padding(.top, 8)
                 }
-                .padding(.bottom, 32)
             }
             .navigationTitle("Calendar")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "barcode.viewfinder")
+                    Button {
+                        isShowingAddSheet = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
                             .foregroundColor(.blue)
-                        Button {
-                            isShowingAddSheet = true
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundColor(.blue)
-                        }
                     }
                 }
             }
             .sheet(isPresented: $isShowingAddSheet) {
                 AddEventView(defaultDate: selectedDate)
             }
+            .sheet(item: $editingEvent) { event in
+                EditEventView(event: event)
+            }
         }
     }
 
     private func eventRow(_ event: Event) -> some View {
         HStack(spacing: 14) {
-            // Date number column
             VStack(spacing: 2) {
                 Text(event.startTime.formatted(.dateTime.day()))
                     .font(.title2)
@@ -90,14 +84,13 @@ struct CalendarView: View {
             }
             .frame(width: 36)
 
-            // Colored accent bar
             RoundedRectangle(cornerRadius: 3)
                 .fill(eventColor(event))
                 .frame(width: 4)
                 .frame(maxHeight: .infinity)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("- \(event.title)")
+                Text(event.title)
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
@@ -105,24 +98,28 @@ struct CalendarView: View {
                     Circle()
                         .fill(eventColor(event))
                         .frame(width: 7, height: 7)
-                    Text("\(event.startTime.formatted(date: .omitted, time: .shortened))")
+                    Text(event.startTime.formatted(date: .omitted, time: .shortened))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
 
             Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(.secondary)
         }
         .padding(14)
         .background(Color(.secondarySystemBackground))
         .cornerRadius(14)
+        .swipeActions(edge: .leading) {
+            Button {
+                editingEvent = event
+            } label: {
+                Label("編輯", systemImage: "pencil")
+            }
+            .tint(.orange)
+        }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
-                deleteEvent(event)
+                modelContext.delete(event)
             } label: {
                 Label("刪除", systemImage: "trash")
             }
@@ -133,20 +130,6 @@ struct CalendarView: View {
         let colors: [Color] = [.blue, .green, .orange, .purple, .red, .teal]
         let index = abs(event.title.hashValue) % colors.count
         return colors[index]
-    }
-
-    private func deleteEvent(_ event: Event) {
-        modelContext.delete(event)
-    }
-}
-
-extension View {
-    func listRowAlignmentCenter() -> some View {
-        HStack {
-            Spacer()
-            self
-            Spacer()
-        }
     }
 }
 
@@ -189,8 +172,58 @@ struct AddEventView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("儲存") {
-                        let newEvent = Event(title: title, startTime: start, endTime: end)
-                        modelContext.insert(newEvent)
+                        modelContext.insert(Event(title: title, startTime: start, endTime: end))
+                        dismiss()
+                    }
+                    .disabled(title.isEmpty)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Edit Event Sheet
+struct EditEventView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let event: Event
+    @State private var title: String
+    @State private var start: Date
+    @State private var end: Date
+
+    init(event: Event) {
+        self.event = event
+        _title = State(initialValue: event.title)
+        _start = State(initialValue: event.startTime)
+        _end = State(initialValue: event.endTime)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("行程資訊")) {
+                    TextField("行程名稱", text: $title)
+                }
+                Section(header: Text("時間設定")) {
+                    DatePicker("開始時間", selection: $start)
+                        .onChange(of: start) { _, newStart in
+                            if end < newStart {
+                                end = newStart.addingTimeInterval(3600)
+                            }
+                        }
+                    DatePicker("結束時間", selection: $end, in: start...)
+                }
+            }
+            .navigationTitle("編輯行程")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("儲存") {
+                        event.title = title
+                        event.startTime = start
+                        event.endTime = end
                         dismiss()
                     }
                     .disabled(title.isEmpty)
@@ -202,5 +235,5 @@ struct AddEventView: View {
 
 #Preview {
     CalendarView()
-        .modelContainer(for: [Expense.self, Event.self, TodoTask.self], inMemory: true)
+        .modelContainer(for: [Event.self, TodoTask.self, ShoppingItem.self], inMemory: true)
 }
