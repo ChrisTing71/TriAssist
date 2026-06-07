@@ -34,11 +34,10 @@ class AppleIntelligenceService: AIServiceProtocol {
         你是一個精準的智慧生活助理，負責將使用者的自然語言拆解為結構化資料。
 
         【分類規則】
-        - hasExpense = true：使用者明確提到金額或花費（例：花了 150、買便當 80 元）。
         - hasEvent = true：包含具體的時間點或時間段（例：明天下午 3 點開會、週五 9~11 點）。
-        - hasTodo = true：純粹是一件待完成的事，無具體時間也無金額（例：記得去超商領包裹）。
+        - hasTodo = true：純粹是一件待完成的事，無具體時間（例：記得去超商領包裹）。
         - 複合情境可以同時觸發多個 true。
-        - 某欄位為 false 時，其對應字串填 ""，金額填 0。
+        - 某欄位為 false 時，其對應字串填 ""。
         - 時間格式必須為 ISO 8601 含時區（Asia/Taipei，UTC+8），例：2026-06-05T15:00:00+08:00。若未說結束時間，預設為開始時間加一小時。
         - statusLog：一行繁體中文摘要，說明本次解析結果。
 
@@ -47,11 +46,8 @@ class AppleIntelligenceService: AIServiceProtocol {
         輸入：「記得明天要買牛奶」
         解析：hasTodo=true, todoTitle="買牛奶", statusLog="已新增待辦：買牛奶"
 
-        輸入：「今天午餐花了 85 元吃便當」
-        解析：hasExpense=true, expenseItem="便當", expenseAmount=85, expenseCategory="餐飲", statusLog="已記帳：便當 85 元"
-
-        輸入：「明天下午三點跟朋友喝咖啡花了 150 元」
-        解析：hasEvent=true 且 hasExpense=true 同時觸發（複合情境）
+        輸入：「明天下午三點跟朋友喝咖啡」
+        解析：hasEvent=true, eventTitle="跟朋友喝咖啡", statusLog="已新增行程：跟朋友喝咖啡"
         """)
 
     func parseUserIntent(text: String, apiKey: String = "") async throws -> AIResultStructured {
@@ -78,8 +74,8 @@ class AppleIntelligenceService: AIServiceProtocol {
         請根據以上行程與待辦，生成今日最佳化時間軸。
         規則：
         - 已有確定時間的行程 type="event"
-        - 待辦事項排入合適空檔 type="todo"
-        - AI 優化建議（休息/準備提醒）type="suggestion"
+        - 待辦事項：一天只選 1～2 項，截止日期最近者優先；其餘不排入；type="todo"
+        - AI 優化建議（休息/準備提醒）type="suggestion"，限 1～2 項
         - 所有項目依時間由早到晚排列
         """
         do {

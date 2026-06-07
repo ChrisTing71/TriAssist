@@ -88,5 +88,5 @@ struct ScheduleView: View {
 
 #Preview {
     ScheduleView()
-        .modelContainer(for: [Expense.self, Event.self, TodoTask.self], inMemory: true)
+        .modelContainer(for: [Event.self, TodoTask.self, ShoppingItem.self], inMemory: true)
 }

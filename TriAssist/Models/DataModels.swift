@@ -9,23 +9,6 @@ import Foundation
 import SwiftData
 
 @Model
-final class Expense {
-    var id: UUID
-    var item: String
-    var amount: Double
-    var category: String
-    var date: Date
-    
-    init(item: String, amount: Double, category: String, date: Date = Date()) {
-        self.id = UUID()
-        self.item = item
-        self.amount = amount
-        self.category = category
-        self.date = date
-    }
-}
-
-@Model
 final class Event {
     var id: UUID
     var title: String
@@ -46,11 +29,26 @@ final class TodoTask {
     var title: String
     var isCompleted: Bool
     var dueDate: Date?
-    
+
     init(title: String, isCompleted: Bool = false, dueDate: Date? = nil) {
         self.id = UUID()
         self.title = title
         self.isCompleted = isCompleted
         self.dueDate = dueDate
+    }
+}
+
+@Model
+final class ShoppingItem {
+    var id: UUID
+    var name: String
+    var quantity: String
+    var isChecked: Bool
+
+    init(name: String, quantity: String = "", isChecked: Bool = false) {
+        self.id = UUID()
+        self.name = name
+        self.quantity = quantity
+        self.isChecked = isChecked
     }
 }

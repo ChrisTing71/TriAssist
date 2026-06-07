@@ -21,16 +21,15 @@ class DashboardViewModel {
     var inputText = ""
     var showAIUnavailableAlert = false
 
-    // Daily schedule timeline items
     var scheduleItems: [DailyScheduleItem] = []
     var isLoadingBriefing = false
-    var briefingMessage = ""   // shown when scheduleItems is empty
+    var briefingMessage = ""
 
-    // Brief result feedback after user submits text
     var lastActionResult = ""
     private var resultDismissTask: Task<Void, Never>?
 
     private var hasLoadedBriefing = false
+    private var lastBriefingDataHash = ""
 
     init() {
         if let savedString = UserDefaults.standard.string(forKey: "selectedAIEngine"),
@@ -46,21 +45,28 @@ class DashboardViewModel {
 
     // MARK: - Load daily briefing
     func loadDailyBriefing(modelContext: ModelContext, forceRefresh: Bool = false) async {
-        guard !hasLoadedBriefing || forceRefresh else { return }
-        hasLoadedBriefing = true
-
-        withAnimation {
-            isLoadingBriefing = true
-            briefingMessage = ""
-            if forceRefresh { scheduleItems = [] }
-        }
-
         let today = Date()
         let allEvents = (try? modelContext.fetch(FetchDescriptor<Event>())) ?? []
         let allTodos = (try? modelContext.fetch(FetchDescriptor<TodoTask>())) ?? []
 
         let todayEvents = allEvents.filter { Calendar.current.isDate($0.startTime, inSameDayAs: today) }
         let activeTodos = allTodos.filter { !$0.isCompleted }
+
+        let currentHash = makeDataHash(todayEvents, activeTodos)
+
+        // Skip if not user-forced, already loaded, and data is unchanged
+        guard forceRefresh || !hasLoadedBriefing || currentHash != lastBriefingDataHash || scheduleItems.isEmpty else {
+            return
+        }
+
+        hasLoadedBriefing = true
+        lastBriefingDataHash = currentHash
+
+        withAnimation {
+            isLoadingBriefing = true
+            briefingMessage = ""
+            if forceRefresh { scheduleItems = [] }
+        }
 
         guard !todayEvents.isEmpty || !activeTodos.isEmpty else {
             withAnimation {
@@ -76,7 +82,11 @@ class DashboardViewModel {
 
         let todoSummary = activeTodos.isEmpty
             ? "無待辦事項"
-            : activeTodos.map { " - \($0.title)" }.joined(separator: "\n")
+            : activeTodos.map { todo in
+                let deadline = todo.dueDate
+                    .map { "（截止：\($0.formatted(date: .abbreviated, time: .omitted))）" } ?? ""
+                return " - \(todo.title)\(deadline)"
+            }.joined(separator: "\n")
 
         let summaryText = """
         我今天的行程如下：
@@ -118,15 +128,6 @@ class DashboardViewModel {
             let formatter = ISO8601DateFormatter()
 
             withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                if result.hasExpense && result.expenseAmount > 0 {
-                    let newExpense = Expense(
-                        item: result.expenseItem.isEmpty ? "未命名消費" : result.expenseItem,
-                        amount: result.expenseAmount,
-                        category: result.expenseCategory.isEmpty ? "未分類" : result.expenseCategory
-                    )
-                    modelContext.insert(newExpense)
-                }
-
                 if result.hasEvent && !result.eventTitle.isEmpty {
                     let start = formatter.date(from: result.eventStartISO) ?? Date()
                     let end = formatter.date(from: result.eventEndISO) ?? start.addingTimeInterval(3600)
@@ -145,10 +146,10 @@ class DashboardViewModel {
                 showResult(result.statusLog)
             }
 
-            // Refresh briefing to reflect newly added items
+            // Refresh briefing if event/todo was added — hash will detect the change
             if result.hasEvent || result.hasTodo {
                 Task {
-                    await loadDailyBriefing(modelContext: modelContext, forceRefresh: true)
+                    await loadDailyBriefing(modelContext: modelContext)
                 }
             }
 
@@ -157,6 +158,18 @@ class DashboardViewModel {
         }
 
         withAnimation { isProcessing = false }
+    }
+
+    private func makeDataHash(_ events: [Event], _ todos: [TodoTask]) -> String {
+        let e = events
+            .sorted { $0.startTime < $1.startTime }
+            .map { "\($0.title)\(Int($0.startTime.timeIntervalSince1970))\(Int($0.endTime.timeIntervalSince1970))" }
+            .joined(separator: ",")
+        let t = todos
+            .map { "\($0.title)\($0.isCompleted)" }
+            .sorted()
+            .joined(separator: ",")
+        return e + "|" + t
     }
 
     private func showResult(_ message: String) {
