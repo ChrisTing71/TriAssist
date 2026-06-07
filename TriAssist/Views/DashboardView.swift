@@ -8,7 +8,6 @@ import SwiftData
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(RoutineManager.self) private var routineManager
     @State private var viewModel = DashboardViewModel()
 
     var body: some View {
@@ -32,16 +31,7 @@ struct DashboardView: View {
             }
             .animation(.spring(response: 0.3), value: viewModel.lastActionResult)
             .navigationTitle("Dashboard")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 14) {
-                        Image(systemName: "barcode.viewfinder").foregroundColor(.blue)
-                        Image(systemName: "dollarsign.circle").foregroundColor(.blue)
-                    }
-                }
-            }
             .task {
-                viewModel.routineSummary = routineManager.aiSummary
                 await viewModel.loadDailyBriefing(modelContext: modelContext)
             }
             .alert("AI 功能未啟用", isPresented: $viewModel.showAIUnavailableAlert) {
@@ -55,13 +45,23 @@ struct DashboardView: View {
     // MARK: - Input Section
     private var inputSection: some View {
         HStack(alignment: .bottom, spacing: 12) {
-            TextField("輸入文字指令...", text: $viewModel.inputText, axis: .vertical)
-                .lineLimit(1...5)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(14)
-                .disabled(viewModel.isProcessing)
+            ZStack(alignment: .topLeading) {
+                if viewModel.inputText.isEmpty {
+                    Text("輸入文字指令...")
+                        .foregroundColor(Color(.placeholderText))
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 14)
+                        .allowsHitTesting(false)
+                }
+                TextEditor(text: $viewModel.inputText)
+                    .scrollContentBackground(.hidden)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .frame(minHeight: 44, maxHeight: 120)
+                    .disabled(viewModel.isProcessing)
+            }
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(14)
 
             Button {
                 Task { await viewModel.handleUserVoiceOrTextInput(modelContext: modelContext) }
@@ -70,7 +70,7 @@ struct DashboardView: View {
                     if viewModel.isProcessing {
                         ProgressView().tint(.white)
                     } else {
-                        Image(systemName: viewModel.inputText.isEmpty ? "mic.fill" : "paperplane.fill")
+                        Image(systemName: "paperplane.fill")
                             .font(.system(size: 18, weight: .semibold))
                     }
                 }
@@ -79,7 +79,7 @@ struct DashboardView: View {
                 .background(Color.blue)
                 .clipShape(Circle())
             }
-            .disabled(viewModel.isProcessing)
+            .disabled(viewModel.isProcessing || viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
     }
 
@@ -93,7 +93,6 @@ struct DashboardView: View {
                 Spacer()
                 Button {
                     Task {
-                        viewModel.routineSummary = routineManager.aiSummary
                         await viewModel.loadDailyBriefing(modelContext: modelContext, forceRefresh: true)
                     }
                 } label: {
@@ -247,5 +246,5 @@ struct DashboardView: View {
 
 #Preview {
     DashboardView()
-        .modelContainer(for: [Expense.self, Event.self, TodoTask.self], inMemory: true)
+        .modelContainer(for: [Event.self, TodoTask.self, ShoppingItem.self], inMemory: true)
 }
