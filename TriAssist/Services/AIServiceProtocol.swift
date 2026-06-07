@@ -9,23 +9,17 @@ import FoundationModels
 // Structured output for user intent parsing
 @Generable
 struct AIResultStructured: Codable {
-    @Guide(description: "只有使用者明確提到『金額、花費、買了什麼』時才為 true，否則絕對要是 false。")
-    let hasExpense: Bool
-    let expenseItem: String
-    let expenseAmount: Double
-    let expenseCategory: String
-
-    @Guide(description: "只有明確提到『特定的時間段、開會、約會』時才為 true。若只是一般任務請標為 false。")
+    @Guide(description: "只有明確提到『特定的時間段、開會、約會、活動』時才為 true。若只是一般任務請標為 false。")
     let hasEvent: Bool
     let eventTitle: String
     let eventStartISO: String
     let eventEndISO: String
 
-    @Guide(description: "只有這是一件『需要被完成的任務』且沒有具體執行時間與花費時才為 true。")
+    @Guide(description: "只有這是一件『需要被完成的任務』且沒有具體執行時間時才為 true。")
     let hasTodo: Bool
     let todoTitle: String
 
-    @Guide(description: "一行繁體中文摘要，說明本次解析了什麼（例：已新增行程：牙醫回診；花費：掛號費 150 元）")
+    @Guide(description: "一行繁體中文摘要，說明本次解析了什麼（例：已新增行程：牙醫回診）")
     let statusLog: String
 }
 
@@ -45,7 +39,6 @@ struct DailyScheduleItem: Codable, Identifiable {
         self.detail = detail
     }
 
-    // Decode from JSON without requiring an id field
     enum CodingKeys: String, CodingKey {
         case time, title, type, detail
     }
