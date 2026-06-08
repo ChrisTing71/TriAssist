@@ -5,11 +5,13 @@
 
 import SwiftUI
 import SwiftData
+import TipKit
 
 struct TodoListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \TodoTask.dueDate) private var todos: [TodoTask]
     @Query(sort: \ShoppingItem.name) private var shoppingItems: [ShoppingItem]
+    private let swipeTip = TodoSwipeTip()
 
     private var sortedShoppingItems: [ShoppingItem] {
         shoppingItems.sorted { a, b in
@@ -28,6 +30,11 @@ struct TodoListView: View {
             List {
                 // MARK: - Todo Section
                 Section {
+                    TipView(swipeTip, arrowEdge: .top)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 0, trailing: 16))
+
                     if todos.isEmpty {
                         Text("暫無待辦任務")
                             .font(.subheadline)
@@ -42,6 +49,10 @@ struct TodoListView: View {
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.95).combined(with: .opacity),
+                                    removal: .move(edge: .trailing).combined(with: .opacity)
+                                ))
                         }
                     }
                 } header: {
@@ -64,6 +75,10 @@ struct TodoListView: View {
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.95).combined(with: .opacity),
+                                    removal: .move(edge: .trailing).combined(with: .opacity)
+                                ))
                         }
                     }
                 } header: {
@@ -72,6 +87,8 @@ struct TodoListView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: todos.count)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: shoppingItems.count)
             .navigationTitle("Todo")
             .sheet(isPresented: $isShowingAddTodoSheet) { AddTodoView() }
             .sheet(isPresented: $isShowingAddShoppingSheet) { AddShoppingItemView() }
@@ -102,7 +119,9 @@ struct TodoListView: View {
     private func todoRow(_ todo: TodoTask) -> some View {
         HStack(alignment: .top, spacing: 14) {
             Button {
-                todo.isCompleted.toggle()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    todo.isCompleted.toggle()
+                }
             } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
@@ -163,7 +182,9 @@ struct TodoListView: View {
     private func shoppingRow(_ item: ShoppingItem) -> some View {
         HStack(spacing: 14) {
             Button {
-                item.isChecked.toggle()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    item.isChecked.toggle()
+                }
             } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)

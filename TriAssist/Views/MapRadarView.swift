@@ -29,12 +29,14 @@ struct MapRadarView: View {
                 if viewModel.isScanning {
                     radarRingsOverlay
                         .frame(maxHeight: .infinity)
+                        .transition(.opacity)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 bottomPanel
                     .padding(.bottom, 12)
             }
+            .animation(.easeInOut(duration: 0.25), value: viewModel.isScanning)
             .navigationTitle("Task Radar")
             .navigationBarTitleDisplayMode(.inline)
             .alert("需要位置權限", isPresented: $viewModel.showPermissionAlert) {
@@ -81,17 +83,21 @@ struct MapRadarView: View {
 
             if !viewModel.searchText.isEmpty {
                 Button {
-                    viewModel.searchText = ""
-                    viewModel.annotations = []
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.searchText = ""
+                        viewModel.annotations = []
+                    }
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                 }
+                .transition(.scale.combined(with: .opacity))
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .animation(.easeInOut(duration: 0.2), value: viewModel.searchText.isEmpty)
     }
 
     // MARK: - Radar rings overlay
@@ -119,16 +125,32 @@ struct MapRadarView: View {
 
     private var bottomPanel: some View {
         VStack(spacing: 12) {
-            if !viewModel.annotations.isEmpty {
+            if !viewModel.noMatchMessage.isEmpty {
+                Text(viewModel.noMatchMessage)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
+                    .transition(.scale(scale: 0.95).combined(with: .opacity))
+            } else if !viewModel.annotations.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(viewModel.annotations) { poi in
                             RecommendationCard(poi: poi, isSelected: viewModel.selectedAnnotation?.id == poi.id)
                                 .onTapGesture { viewModel.selectAnnotation(poi) }
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
                         }
                     }
                     .padding(.horizontal, 16)
                 }
+                .transition(.asymmetric(
+                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                    removal: .opacity
+                ))
             }
 
             Button {
@@ -157,6 +179,8 @@ struct MapRadarView: View {
             .popoverTip(tip)
             .padding(.horizontal, 16)
         }
+        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: viewModel.annotations.count)
+        .animation(.easeInOut(duration: 0.3), value: viewModel.noMatchMessage)
     }
 }
 
@@ -249,22 +273,9 @@ private struct RecommendationCard: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 6)
 
-            // ── Address & Phone ──
-            VStack(alignment: .leading, spacing: 4) {
-                if let address = poi.address {
-                    Label(address, systemImage: "map")
-                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
-                if let phone = poi.phone {
-                    Label(phone, systemImage: "phone")
-                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
-            }
-            .padding(.horizontal, 12)
-
             // ── AI description ──
+            Divider().padding(.horizontal, 12).padding(.top, 8)
             if !poi.aiDescription.isEmpty {
-                Divider().padding(.horizontal, 12).padding(.top, 8)
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "sparkles")
                         .font(.caption2)
@@ -277,9 +288,8 @@ private struct RecommendationCard: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
+                .transition(.opacity)
             } else {
-                // Loading shimmer while AI generates
-                Divider().padding(.horizontal, 12).padding(.top, 8)
                 HStack(spacing: 6) {
                     ProgressView().scaleEffect(0.6)
                     Text("AI 分析中…")
@@ -287,6 +297,7 @@ private struct RecommendationCard: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
+                .transition(.opacity)
             }
 
             // ── Matched items ──
@@ -318,6 +329,7 @@ private struct RecommendationCard: View {
         }
         .padding(.bottom, 4)
         .frame(width: 260)
+        .animation(.easeInOut(duration: 0.4), value: poi.aiDescription.isEmpty)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(.regularMaterial)

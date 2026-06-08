@@ -5,10 +5,15 @@
 
 import SwiftUI
 import SwiftData
+import TipKit
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(RoutineManager.self) private var routineManager
     @State private var viewModel = DashboardViewModel()
+    @AppStorage("selectedAIEngine") private var selectedEngine: AIEngine = .cloud
+    @AppStorage("customApiKey") private var apiKey: String = ""
+    private let inputTip = DashboardInputTip()
 
     var body: some View {
         NavigationStack {
@@ -32,8 +37,13 @@ struct DashboardView: View {
             .animation(.spring(response: 0.3), value: viewModel.lastActionResult)
             .navigationTitle("Dashboard")
             .task {
+                viewModel.selectedEngine = selectedEngine
+                viewModel.apiKey = apiKey
+                viewModel.routineSummary = routineManager.aiSummary
                 await viewModel.loadDailyBriefing(modelContext: modelContext)
             }
+            .onChange(of: selectedEngine) { _, new in viewModel.selectedEngine = new }
+            .onChange(of: apiKey) { _, new in viewModel.apiKey = new }
             .alert("AI 功能未啟用", isPresented: $viewModel.showAIUnavailableAlert) {
                 Button("確定", role: .cancel) { }
             } message: {
@@ -80,6 +90,7 @@ struct DashboardView: View {
                 .clipShape(Circle())
             }
             .disabled(viewModel.isProcessing || viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .popoverTip(inputTip)
         }
     }
 
@@ -93,6 +104,7 @@ struct DashboardView: View {
                 Spacer()
                 Button {
                     Task {
+                        viewModel.routineSummary = routineManager.aiSummary
                         await viewModel.loadDailyBriefing(modelContext: modelContext, forceRefresh: true)
                     }
                 } label: {
@@ -118,17 +130,27 @@ struct DashboardView: View {
 
             if viewModel.isLoadingBriefing {
                 loadingView
+                    .transition(.opacity)
             } else if !viewModel.briefingMessage.isEmpty {
                 emptyStateView(message: viewModel.briefingMessage)
+                    .transition(.scale(scale: 0.95).combined(with: .opacity))
             } else if viewModel.scheduleItems.isEmpty {
                 emptyStateView(message: "今天目前沒有行程與待辦任務，跟我說說你今天的計畫吧！")
+                    .transition(.scale(scale: 0.95).combined(with: .opacity))
             } else {
                 timelineView
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .opacity
+                    ))
             }
         }
         .padding(16)
         .background(Color(.secondarySystemBackground))
         .cornerRadius(16)
+        .animation(.easeInOut(duration: 0.35), value: viewModel.isLoadingBriefing)
+        .animation(.easeInOut(duration: 0.35), value: viewModel.scheduleItems.isEmpty)
+        .animation(.easeInOut(duration: 0.35), value: viewModel.briefingMessage)
     }
 
     // MARK: - Timeline
@@ -136,6 +158,15 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(viewModel.scheduleItems.enumerated()), id: \.element.id) { index, item in
                 timelineRow(item, isLast: index == viewModel.scheduleItems.count - 1)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .leading).combined(with: .opacity),
+                        removal: .opacity
+                    ))
+                    .animation(
+                        .spring(response: 0.4, dampingFraction: 0.8)
+                            .delay(Double(index) * 0.06),
+                        value: viewModel.scheduleItems.count
+                    )
             }
         }
     }

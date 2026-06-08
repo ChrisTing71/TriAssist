@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SwiftData
+import TipKit
 
 struct CalendarView: View {
     @Environment(\.modelContext) private var modelContext
@@ -13,6 +14,7 @@ struct CalendarView: View {
     @State private var selectedDate = Date()
     @State private var isShowingAddSheet = false
     @State private var editingEvent: Event? = nil
+    private let swipeTip = CalendarSwipeTip()
 
     private var filteredEvents: [Event] {
         allEvents.filter { Calendar.current.isDate($0.startTime, inSameDayAs: selectedDate) }
@@ -28,6 +30,9 @@ struct CalendarView: View {
                     .cornerRadius(16)
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
+                    .onChange(of: selectedDate) { _, _ in
+                        withAnimation(.easeInOut(duration: 0.3)) { }
+                    }
 
                 if filteredEvents.isEmpty {
                     HStack {
@@ -39,21 +44,36 @@ struct CalendarView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 24)
+                    .transition(.opacity)
                     Spacer()
                 } else {
                     List {
+                        TipView(swipeTip, arrowEdge: .top)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 0, trailing: 16))
+
                         ForEach(filteredEvents) { event in
                             eventRow(event)
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
                         }
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                     .padding(.top, 8)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
                 }
             }
+            .animation(.easeInOut(duration: 0.3), value: selectedDate)
             .navigationTitle("Calendar")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
