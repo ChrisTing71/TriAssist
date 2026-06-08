@@ -17,6 +17,7 @@ final class MapRadarViewModel: NSObject {
     var selectedAnnotation: POIAnnotation? = nil
     var isScanning = false
     var isGeneratingDescriptions = false
+    var noMatchMessage = ""
     var searchText = ""
     private var scanGeneration = 0
     var showPermissionAlert = false
@@ -63,6 +64,7 @@ final class MapRadarViewModel: NSObject {
         isScanning = true
         isGeneratingDescriptions = false
         annotations = []
+        noMatchMessage = ""
 
         do {
             let coord = try await fetchCurrentLocation()
@@ -74,6 +76,13 @@ final class MapRadarViewModel: NSObject {
             ))
 
             let queries = generateQueries(todos: todos, shoppingItems: shoppingItems)
+
+            guard !queries.isEmpty else {
+                noMatchMessage = "目前待辦事項不需要前往特定地點，完成後再來看看吧！"
+                isScanning = false
+                return
+            }
+
             var found: [POIAnnotation] = []
 
             for query in queries {
@@ -287,44 +296,82 @@ final class MapRadarViewModel: NSObject {
 
     private func generateQueries(todos: [TodoTask], shoppingItems: [ShoppingItem]) -> [String] {
         var queries = Set<String>()
+
+        let activeTodos    = todos.filter { !$0.isCompleted }.map(\.title)
+        let activeShipping = shoppingItems.filter { !$0.isChecked }.map(\.name)
+
+        // 有購物清單 → 搜超市＋便利商店
+        if !activeShipping.isEmpty {
+            queries.insert("全聯超市")
+            queries.insert("便利商店")
+        }
+
+        // 待辦關鍵字 → 對應店型（只有真正匹配才加）
         let keywords: [(String, String)] = [
-            ("牛奶", "全聯"), ("蛋", "全聯"), ("菜", "全聯"), ("水果", "全聯"),
-            ("藥", "藥局"), ("感冒", "藥局"), ("維他命", "藥局"),
+            ("牛奶", "全聯超市"), ("蛋", "全聯超市"), ("菜", "全聯超市"), ("水果", "全聯超市"),
+            ("洗", "大賣場"), ("清潔", "大賣場"), ("衛生", "大賣場"),
+            ("藥", "藥局"), ("感冒", "藥局"), ("維他命", "藥局"), ("保健", "藥局"),
             ("書", "書店"), ("文具", "文具店"), ("筆", "文具店"),
-            ("咖啡", "咖啡廳"), ("飲料", "便利商店"), ("零食", "便利商店"),
+            ("咖啡", "咖啡廳"),
+            ("飲料", "便利商店"), ("零食", "便利商店"),
             ("列印", "便利商店"), ("影印", "便利商店"), ("包裹", "便利商店"),
-            ("超商", "便利商店"), ("全家", "便利商店"), ("7-11", "便利商店"),
+            ("手機", "手機維修"), ("維修", "維修店"), ("電腦", "電腦維修"),
+            ("剪髮", "理髮廳"), ("理髮", "理髮廳"), ("美髮", "美髮沙龍"),
+            ("眼鏡", "眼鏡行"), ("配鏡", "眼鏡行"),
+            ("郵局", "郵局"), ("掛號", "郵局"),
         ]
-        let allTitles = todos.filter { !$0.isCompleted }.map(\.title)
-            + shoppingItems.filter { !$0.isChecked }.map(\.name)
-        for title in allTitles {
+        for title in activeTodos {
             for (kw, store) in keywords where title.contains(kw) {
                 queries.insert(store)
             }
         }
-        if queries.isEmpty { queries.insert("便利商店") }
+
+        // 不再強制 fallback — 沒有匹配就不搜尋任何店
         return Array(queries)
     }
 
     private func matchedItems(for mapItem: MKMapItem, todos: [TodoTask], shoppingItems: [ShoppingItem]) -> [String] {
         let name = mapItem.name?.lowercased() ?? ""
+        let activeTodos    = todos.filter { !$0.isCompleted }.map(\.title)
+        let activeShipping = shoppingItems.filter { !$0.isChecked }.map(\.name)
+
+        // 超市 → 只顯示購物清單
+        let isGrocery = name.contains("全聯") || name.contains("超市") || name.contains("大潤發")
+            || name.contains("家樂福") || name.contains("costco") || name.contains("大賣場")
+        if isGrocery { return activeShipping }
+
+        // 便利商店 → 購物清單 + 真正有超商相關的待辦（包裹、列印、飲料、零食）
+        let isConvenience = name.contains("便利") || name.contains("全家")
+            || name.contains("7-") || name.contains("seven") || name.contains("ok mart")
+            || name.contains("萊爾富") || name.contains("hi-life")
+        if isConvenience {
+            let convKws = ["包裹", "列印", "影印", "飲料", "零食", "繳費", "超商"]
+            let relevantTodos = activeTodos.filter { t in convKws.contains(where: { t.contains($0) }) }
+            return activeShipping + relevantTodos
+        }
+
+        // 其他店型 → 嚴格關鍵字比對，沒有匹配就回傳空陣列
         let storeToKeywords: [String: [String]] = [
-            "全聯": ["牛奶", "蛋", "菜", "水果", "食材", "日用品"],
             "藥局": ["藥", "感冒", "維他命", "保健"],
+            "藥妝": ["藥", "保健", "洗", "清潔"],
             "書店": ["書", "閱讀"],
             "文具": ["文具", "筆", "紙"],
-            "便利": ["飲料", "零食", "列印", "影印", "包裹"],
             "咖啡": ["咖啡"],
+            "手機": ["手機", "維修"],
+            "3c": ["手機", "電腦", "維修"],
+            "理髮": ["剪髮", "理髮", "美髮"],
+            "美髮": ["剪髮", "理髮", "美髮"],
+            "眼鏡": ["眼鏡", "配鏡"],
+            "郵局": ["郵局", "包裹", "掛號"],
         ]
-        let allItems = todos.filter { !$0.isCompleted }.map(\.title)
-            + shoppingItems.filter { !$0.isChecked }.map(\.name)
+        let allItems = activeTodos + activeShipping
         var matched: [String] = []
         for (storeKw, itemKws) in storeToKeywords where name.contains(storeKw) {
             for item in allItems where itemKws.contains(where: { item.contains($0) }) {
-                matched.append(item)
+                if !matched.contains(item) { matched.append(item) }
             }
         }
-        return matched.isEmpty ? allItems.prefix(2).map { $0 } : matched
+        return matched
     }
 }
 
