@@ -6,7 +6,6 @@
 import Foundation
 import MapKit
 import SwiftUI
-import TipKit
 
 struct POIAnnotation: Identifiable {
     let id = UUID()
@@ -107,8 +106,3 @@ struct POIAnnotation: Identifiable {
     }
 }
 
-struct MapRadarTip: Tip {
-    var title: Text { Text("找附近的店") }
-    var message: Text? { Text("點「我有空」，自動掃描 500 公尺內符合購物清單的商店。") }
-    var image: Image? { Image(systemName: "location.fill.viewfinder") }
-}
