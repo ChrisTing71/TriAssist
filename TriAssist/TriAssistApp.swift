@@ -9,6 +9,9 @@ import TipKit
 
 @main
 struct TriAssistApp: App {
+    @State private var authManager = AuthManager()
+    @State private var routineManager = RoutineManager()
+
     init() {
         try? Tips.configure([.displayFrequency(.immediate)])
     }
@@ -31,6 +34,8 @@ struct TriAssistApp: App {
                 SettingsView()
                     .tabItem { Label("Settings", systemImage: "gearshape.fill") }
             }
+            .environment(authManager)
+            .environment(routineManager)
         }
         .modelContainer(for: [Event.self, TodoTask.self, ShoppingItem.self])
     }

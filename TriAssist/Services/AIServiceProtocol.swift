@@ -15,7 +15,12 @@ struct AIResultStructured: Codable {
     let eventStartISO: String
     let eventEndISO: String
 
-    @Guide(description: "只有這是一件『需要被完成的任務』且沒有具體執行時間時才為 true。")
+    @Guide(description: "只有明確要『購買某樣物品』時才為 true（例：要買牛奶、記得買洗髮精、添購衛生紙）。一般任務不算。")
+    let hasShoppingItem: Bool
+    let shoppingItemName: String
+    let shoppingItemQuantity: String
+
+    @Guide(description: "只有這是一件『需要被完成的任務』且不是「買東西」且沒有具體執行時間時才為 true。")
     let hasTodo: Bool
     let todoTitle: String
 

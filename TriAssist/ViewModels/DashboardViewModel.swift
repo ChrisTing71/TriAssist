@@ -25,6 +25,8 @@ class DashboardViewModel {
     var isLoadingBriefing = false
     var briefingMessage = ""
 
+    var routineSummary: String = ""
+
     var lastActionResult = ""
     private var resultDismissTask: Task<Void, Never>?
 
@@ -88,8 +90,13 @@ class DashboardViewModel {
                 return " - \(todo.title)\(deadline)"
             }.joined(separator: "\n")
 
+        let routineSection = routineSummary.isEmpty ? "" : """
+        【固定行程】：\(routineSummary)
+
+        """
+
         let summaryText = """
-        我今天的行程如下：
+        \(routineSection)我今天的行程如下：
         \(eventSummary)
 
         我的待辦清單如下：
@@ -121,6 +128,11 @@ class DashboardViewModel {
             return
         }
 
+        if selectedEngine == .cloud && apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            showResult("⚠️ 請先在「Settings」頁面填入 Gemini API Key")
+            return
+        }
+
         withAnimation { isProcessing = true }
 
         do {
@@ -132,6 +144,10 @@ class DashboardViewModel {
                     let start = formatter.date(from: result.eventStartISO) ?? Date()
                     let end = formatter.date(from: result.eventEndISO) ?? start.addingTimeInterval(3600)
                     modelContext.insert(Event(title: result.eventTitle, startTime: start, endTime: end))
+                }
+
+                if result.hasShoppingItem && !result.shoppingItemName.isEmpty {
+                    modelContext.insert(ShoppingItem(name: result.shoppingItemName, quantity: result.shoppingItemQuantity))
                 }
 
                 if result.hasTodo && !result.todoTitle.isEmpty {

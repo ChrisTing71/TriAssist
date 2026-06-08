@@ -20,19 +20,22 @@ class CloudAIService: AIServiceProtocol {
 
         【分類規則】
         - hasEvent = true：包含具體的時間點或時間段（例：明天下午 3 點開會、週五 9~11 點）。
-        - hasTodo = true：純粹是一件待完成的事，無具體時間（例：記得去超商領包裹）。
-        - 複合情境可以同時觸發多個 true。
-        - 某欄位為 false 時，其對應字串填 ""。
-        - 時間格式必須為 ISO 8601 含時區（例：2026-06-05T15:00:00+08:00）；若只說日期未說時間，預設 09:00；若未說結束時間，預設為開始時間加一小時。
-        - statusLog：一行繁體中文摘要，說明本次解析結果。
+        - hasShoppingItem = true：明確要「購買某樣物品」（例：要買牛奶、買洗髮精、添購衛生紙）。shoppingItemName 填物品名稱，shoppingItemQuantity 填數量（無則填 ""）。
+        - hasTodo = true：需要完成的任務，且不是「買東西」，也沒有具體時間（例：記得去超商領包裹、繳電話費）。
+        - 複合情境可同時觸發多個 true。某欄位為 false 時，對應字串填 ""。
+        - 時間格式：ISO 8601 含時區（例：2026-06-05T15:00:00+08:00）；未說時間預設 09:00；未說結束時間預設加一小時。
+        - statusLog：一行繁體中文摘要。
 
         【Few-shot 範例】
 
         輸入：「明天下午三點跟朋友喝咖啡」
-        輸出：{"hasEvent":true,"eventTitle":"跟朋友喝咖啡","eventStartISO":"<明天T15:00:00+08:00>","eventEndISO":"<明天T16:00:00+08:00>","hasTodo":false,"todoTitle":"","statusLog":"已新增行程：跟朋友喝咖啡"}
+        輸出：{"hasEvent":true,"eventTitle":"跟朋友喝咖啡","eventStartISO":"<明天T15:00:00+08:00>","eventEndISO":"<明天T16:00:00+08:00>","hasShoppingItem":false,"shoppingItemName":"","shoppingItemQuantity":"","hasTodo":false,"todoTitle":"","statusLog":"已新增行程：跟朋友喝咖啡"}
 
-        輸入：「記得明天要買牛奶」
-        輸出：{"hasEvent":false,"eventTitle":"","eventStartISO":"","eventEndISO":"","hasTodo":true,"todoTitle":"買牛奶","statusLog":"已新增待辦：買牛奶"}
+        輸入：「要買牛奶兩瓶」
+        輸出：{"hasEvent":false,"eventTitle":"","eventStartISO":"","eventEndISO":"","hasShoppingItem":true,"shoppingItemName":"牛奶","shoppingItemQuantity":"兩瓶","hasTodo":false,"todoTitle":"","statusLog":"已加入購物清單：牛奶 x 兩瓶"}
+
+        輸入：「記得去超商領包裹」
+        輸出：{"hasEvent":false,"eventTitle":"","eventStartISO":"","eventEndISO":"","hasShoppingItem":false,"shoppingItemName":"","shoppingItemQuantity":"","hasTodo":true,"todoTitle":"去超商領包裹","statusLog":"已新增待辦：去超商領包裹"}
 
         你必須只回傳一個 JSON 物件，不得包含任何說明、註解或 Markdown 標籤。
         """
