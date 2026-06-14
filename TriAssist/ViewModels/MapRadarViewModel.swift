@@ -90,8 +90,8 @@ final class MapRadarViewModel: NSObject {
                 request.naturalLanguageQuery = query
                 request.region = MKCoordinateRegion(
                     center: coord,
-                    latitudinalMeters: 700,
-                    longitudinalMeters: 700
+                    latitudinalMeters: 1400,
+                    longitudinalMeters: 1400
                 )
                 request.resultTypes = .pointOfInterest
 
@@ -103,17 +103,24 @@ final class MapRadarViewModel: NSObject {
                             longitude: item.placemark.coordinate.longitude
                         )
                         let dist = userLoc.distance(from: itemLoc)
-                        guard dist <= 500 else { continue }
+                        guard dist <= 1000 else { continue }
                         guard !found.contains(where: { $0.mapItem.name == item.name }) else { continue }
 
                         let matched = matchedItems(for: item, todos: todos, shoppingItems: shoppingItems)
+                        guard !matched.isEmpty else { continue }
                         found.append(POIAnnotation(mapItem: item, matchedItems: matched, distance: dist))
                     }
                 }
             }
 
+            let shoppingNames = Set(shoppingItems.filter { !$0.isChecked }.map(\.name))
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                annotations = found.sorted { $0.distance < $1.distance }
+                annotations = found.sorted { a, b in
+                    let aHasShopping = a.matchedItems.contains(where: { shoppingNames.contains($0) })
+                    let bHasShopping = b.matchedItems.contains(where: { shoppingNames.contains($0) })
+                    if aHasShopping != bHasShopping { return aHasShopping }
+                    return a.distance < b.distance
+                }
             }
 
             if !found.isEmpty {
@@ -132,7 +139,7 @@ final class MapRadarViewModel: NSObject {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
 
-        // Require location for 500m search; prompt if not yet determined
+        // Require location for 1km search; prompt if not yet determined
         if locationManager.authorizationStatus == .notDetermined {
             locationManager.requestWhenInUseAuthorization()
             return
@@ -168,7 +175,7 @@ final class MapRadarViewModel: NSObject {
                     let itemLoc = CLLocation(latitude: item.placemark.coordinate.latitude,
                                              longitude: item.placemark.coordinate.longitude)
                     let dist = userLoc.distance(from: itemLoc)
-                    guard dist <= 500 else { return nil }
+                    guard dist <= 1000 else { return nil }
                     return POIAnnotation(mapItem: item, matchedItems: [], distance: dist)
                 }
                 .sorted { $0.distance < $1.distance }
@@ -221,7 +228,7 @@ final class MapRadarViewModel: NSObject {
         }.joined(separator: "\n")
 
         let prompt = """
-        以下是使用者附近 500 公尺內的地點清單，請為每個地點寫一句繁體中文推薦說明（20～30字），
+        以下是使用者附近 1 公里內的地點清單，請為每個地點寫一句繁體中文推薦說明（20～30字），
         說明這個地點的實用價值、能完成哪些事、或為何值得前往。語氣要親切自然。
         只回傳 JSON 陣列，格式：[{"index":0,"desc":"..."},...]
 

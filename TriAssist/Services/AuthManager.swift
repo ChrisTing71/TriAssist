@@ -30,47 +30,6 @@ class AuthManager: NSObject {
         }
     }
 
-    // MARK: - Sign in with Apple
-
-    func handleAppleSignInResult(_ result: Result<ASAuthorization, Error>) {
-        switch result {
-        case .success(let auth):
-            guard let credential = auth.credential as? ASAuthorizationAppleIDCredential else {
-                errorMessage = "無法取得 Apple 憑證，請重試。"
-                return
-            }
-
-            var name = ""
-            if let fullName = credential.fullName {
-                let parts = [fullName.givenName, fullName.familyName].compactMap { $0 }
-                name = parts.joined(separator: " ")
-            }
-            if name.isEmpty, let saved = currentUser, saved.provider == .apple, saved.id == credential.user {
-                name = saved.name
-            }
-
-            let user = UserProfile(
-                id: credential.user,
-                name: name.isEmpty ? "Apple 使用者" : name,
-                email: credential.email ?? currentUser?.email ?? "",
-                provider: .apple
-            )
-            saveUser(user)
-            errorMessage = ""
-
-        case .failure(let error):
-            let code = (error as? ASAuthorizationError)?.code
-            switch code {
-            case .canceled:
-                break
-            case .unknown:
-                errorMessage = "Sign in with Apple 未啟用。\n請在 Xcode → Signing & Capabilities 加入此功能，並確認模擬器已登入 iCloud。"
-            default:
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-
     // MARK: - Sign in with Google (PKCE via ASWebAuthenticationSession)
 
     func signInWithGoogle() async {

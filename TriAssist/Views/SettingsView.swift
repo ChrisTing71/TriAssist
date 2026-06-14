@@ -4,7 +4,6 @@
 //
 
 import SwiftUI
-import AuthenticationServices
 import TipKit
 
 struct SettingsView: View {
@@ -13,7 +12,6 @@ struct SettingsView: View {
     @AppStorage("selectedAIEngine") private var selectedEngine: AIEngine = .cloud
     @AppStorage("customApiKey")     private var apiKey: String = ""
     @State private var showSignOutConfirm = false
-    @State private var isSigningInWithApple = false
     @State private var showRoutineEditor = false
     private let routineTip = RoutineSettingsTip()
 
@@ -86,11 +84,11 @@ struct SettingsView: View {
                 HStack(spacing: 14) {
                     ZStack {
                         Circle()
-                            .fill(user.provider == .apple ? Color(.systemGray5) : Color.blue.opacity(0.15))
+                            .fill(Color.blue.opacity(0.15))
                             .frame(width: 52, height: 52)
                         Text(user.initials)
                             .font(.title3).bold()
-                            .foregroundColor(user.provider == .apple ? .primary : .blue)
+                            .foregroundColor(.blue)
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(user.displayName).font(.headline)
@@ -118,31 +116,6 @@ struct SettingsView: View {
     // MARK: - Sign-in buttons
     private var signInSection: some View {
         Section(header: Text("帳號"), footer: signInFooter) {
-            ZStack(alignment: .leading) {
-                SignInWithAppleButton(.signIn, onRequest: { request in
-                    request.requestedScopes = [.fullName, .email]
-                    authManager.errorMessage = ""
-                    isSigningInWithApple = true
-                }, onCompletion: { result in
-                    Task { @MainActor in
-                        isSigningInWithApple = false
-                        authManager.handleAppleSignInResult(result)
-                    }
-                })
-                .signInWithAppleButtonStyle(.black)
-                .frame(height: 44)
-                .cornerRadius(10)
-                .disabled(isSigningInWithApple || authManager.isLoading)
-
-                if isSigningInWithApple {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.black.opacity(0.85))
-                        .frame(height: 44)
-                    HStack { Spacer(); ProgressView().tint(.white); Spacer() }
-                }
-            }
-            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-
             Button {
                 authManager.errorMessage = ""
                 Task { await authManager.signInWithGoogle() }
@@ -168,7 +141,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            .disabled(isSigningInWithApple || authManager.isLoading)
+            .disabled(authManager.isLoading)
 
             if !authManager.errorMessage.isEmpty {
                 HStack(spacing: 6) {
@@ -185,10 +158,9 @@ struct SettingsView: View {
             .font(.caption)
     }
 
-    @ViewBuilder
     private func providerBadge(_ provider: AuthProvider) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: provider == .apple ? "apple.logo" : "g.circle.fill")
+            Image(systemName: "g.circle.fill")
                 .font(.caption)
             Text(provider.rawValue)
                 .font(.caption2).fontWeight(.semibold)

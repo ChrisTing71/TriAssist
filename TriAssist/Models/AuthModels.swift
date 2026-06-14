@@ -6,7 +6,6 @@
 import Foundation
 
 enum AuthProvider: String, Codable {
-    case apple = "Apple"
     case google = "Google"
 }
 

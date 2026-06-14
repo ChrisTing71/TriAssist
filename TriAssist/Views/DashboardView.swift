@@ -14,6 +14,7 @@ struct DashboardView: View {
     @AppStorage("selectedAIEngine") private var selectedEngine: AIEngine = .cloud
     @AppStorage("customApiKey") private var apiKey: String = ""
     private let inputTip = DashboardInputTip()
+    @FocusState private var isInputFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -27,6 +28,8 @@ struct DashboardView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 32)
                 }
+                .scrollDismissesKeyboard(.interactively)
+                .onTapGesture { isInputFocused = false }
 
                 if !viewModel.lastActionResult.isEmpty {
                     resultBanner
@@ -64,6 +67,7 @@ struct DashboardView: View {
                         .allowsHitTesting(false)
                 }
                 TextEditor(text: $viewModel.inputText)
+                    .focused($isInputFocused)
                     .scrollContentBackground(.hidden)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
